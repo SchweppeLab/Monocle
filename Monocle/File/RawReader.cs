@@ -512,8 +512,6 @@ namespace Monocle.File
 
         private string readDetectorType(MassAnalyzerType type) {
             switch(type) {
-                case MassAnalyzerType.MassAnalyzerASTMS:
-                    return "ASTMS";
                 case MassAnalyzerType.MassAnalyzerFTMS:
                     return "FTMS";
                 case MassAnalyzerType.MassAnalyzerITMS:
