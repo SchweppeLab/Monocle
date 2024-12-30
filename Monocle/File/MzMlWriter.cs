@@ -7,6 +7,7 @@ using System.Security.Cryptography;
 using System.Xml;
 using System.Xml.Serialization;
 using Monocle.Data;
+using ProjectMIDAS.Data.Spectrum;
 
 namespace Monocle.File
 {
@@ -197,7 +198,7 @@ namespace Monocle.File
             writer.WriteAttributeString("defaultDataProcessingRef", "ThermoRawFileParserProcessing");
         }
 
-        public void WriteScan(Scan scan) {
+        public void WriteScan(Spectrum scan) {
 
             writer.WriteStartElement("spectrum");
 
@@ -210,25 +211,17 @@ namespace Monocle.File
 
             writer.WriteAttributeString("index", (scan.ScanNumber - 1).ToString());
             writer.WriteAttributeString("id", "scan=" + scan.ScanNumber.ToString());
-            writer.WriteAttributeString("defaultArrayLength", scan.PeakCount.ToString());
+            writer.WriteAttributeString("defaultArrayLength", scan.Count().ToString());
 
-            WriteCVParam("MS:1000511", scan.MsOrder.ToString());
-            if (scan.MsOrder > 1) {
+            WriteCVParam("MS:1000511", scan.MsLevel.ToString());
+            if (scan.MsLevel > 1) {
                 WriteCVParam("MS:1000580", "");
             } else {
                 WriteCVParam("MS:1000579", "");
             }
 
-            switch(scan.Polarity) {
-                case Polarity.Positive:
-                    WriteCVParam("MS:1000130", "");
-                    break;
-                case Polarity.Negative:
-                    WriteCVParam("MS:1000129", "");
-                    break;
-                default:
-                    break;
-            }
+            if(scan.Polarity) WriteCVParam("MS:1000130", "");
+            else WriteCVParam("MS:1000129", "");
 
             WriteCVParam("MS:1000127", ""); // centroid spectrum
             WriteCVParam("MS:1000504", scan.BasePeakMz.ToString("G17", CultureInfo.InvariantCulture), "MS:1000040");
@@ -251,7 +244,7 @@ namespace Monocle.File
 
             // time in minutes
             WriteCVParam("MS:1000016", scan.RetentionTime.ToString(), "UO:0000031");
-            WriteCVParam("MS:1000512", scan.FilterLine);
+            WriteCVParam("MS:1000512", scan.ScanFilter);
 
             writer.WriteStartElement("scanWindowList");
             writer.WriteAttributeString("count", "1");
@@ -284,7 +277,7 @@ namespace Monocle.File
                     writer.WriteStartElement("selectedIon");
 
                     WriteCVParam("MS:1000041", precursor.Charge.ToString());
-                    WriteCVParam("MS:1000744", precursor.Mz.ToString("G17", CultureInfo.InvariantCulture), "MS:1000040");
+                    WriteCVParam("MS:1000744", precursor.MonoisotopicMz.ToString("G17", CultureInfo.InvariantCulture), "MS:1000040");
 
                     writer.WriteEndElement(); // selectedIon
                     writer.WriteEndElement(); // selectedIonList
@@ -410,16 +403,16 @@ namespace Monocle.File
         /// </summary>
         /// <param name="scan"></param>
         /// <returns></returns>
-        private string EncodePeaks(Scan scan, bool intensity=false) {
-            if (scan.PeakCount == 0) {
+        private string EncodePeaks(Spectrum scan, bool intensity=false) {
+            if (scan.Count() == 0) {
                 return "AAAAAAAAAAA=";
             }
             
             // Allocate space for m/z and int pairs, four bytes each.
-            byte[] bytes = new byte[scan.PeakCount * 4];
+            byte[] bytes = new byte[scan.Count() * 4];
 
-            for (int i = 0; i < scan.PeakCount; ++i) {
-                var peak = scan.Centroids[i];
+            for (int i = 0; i < scan.Count(); ++i) {
+                var peak = scan.DataPoints[i];
                 double data;
                 if (intensity) {
                     data = peak.Intensity;

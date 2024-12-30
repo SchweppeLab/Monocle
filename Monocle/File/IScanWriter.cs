@@ -1,5 +1,6 @@
 ﻿
 using Monocle.Data;
+using ProjectMIDAS.Data.Spectrum;
 
 namespace Monocle.File {
     public interface IScanWriter
@@ -27,6 +28,6 @@ namespace Monocle.File {
         /// Writes a single scan to the output.
         /// </summary>
         /// <param name="scan">The scan to write.</param>
-        void WriteScan(Scan scan);
+        void WriteScan(Spectrum scan);
     }
 }

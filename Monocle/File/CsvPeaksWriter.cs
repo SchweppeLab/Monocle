@@ -1,5 +1,6 @@
 
 using Monocle.Data;
+using ProjectMIDAS.Data.Spectrum;
 using System.Globalization;
 using System.IO;
 
@@ -53,15 +54,16 @@ namespace Monocle.File {
         /// Writes scan data to a line at the end of the CSV file.
         /// </summary>
         /// <param name="scan"></param>
-        public void WriteScan(Scan scan)
+        public void WriteScan(Spectrum scan)
         {
-            for (int i = 0; i < scan.Centroids.Count; ++i) {
+            for (int i = 0; i < scan.Count(); ++i) {
                 writer.WriteLine(scan.ScanNumber + delimiter +
-                    scan.MsOrder + delimiter +
-                    scan.Centroids[i].Mz.ToString("G17", CultureInfo.InvariantCulture) + delimiter +
-                    scan.Centroids[i].Intensity.ToString("G17", CultureInfo.InvariantCulture) + delimiter +
-                    scan.Centroids[i].Noise.ToString("G17", CultureInfo.InvariantCulture) + delimiter +
-                    scan.Centroids[i].Resolution.ToString("G17", CultureInfo.InvariantCulture));
+                    scan.MsLevel + delimiter +
+                    scan.DataPoints[i].Mz.ToString("G17", CultureInfo.InvariantCulture) + delimiter +
+                    scan.DataPoints[i].Intensity.ToString("G17", CultureInfo.InvariantCulture) //+ delimiter +
+                    //scan.DataPoints[i].Noise.ToString("G17", CultureInfo.InvariantCulture) + delimiter +
+                    //scan.DataPoints[i].Resolution.ToString("G17", CultureInfo.InvariantCulture)
+                    );
             }
         }
     }

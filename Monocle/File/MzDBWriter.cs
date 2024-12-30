@@ -1,9 +1,12 @@
 
 using Monocle.Data;
+using ProjectMIDAS.Data.Spectrum;
+using ProjectMIDAS.Data;
 using System;
 using System.IO;
 using ICSharpCode.SharpZipLib.Zip.Compression.Streams;
 using Microsoft.Data.Sqlite;
+using ThermoFisher.CommonCore.Data.Business;
 
 namespace Monocle.File {
 
@@ -177,18 +180,18 @@ namespace Monocle.File {
         /// <summary>
         /// Writes a scan to the mzdb file.
         /// </summary>
-        public void WriteScan(Scan scan)
+        public void WriteScan(Spectrum scan)
         {
             double precursorMH = 0;
             double precursorMz = 0;
             int charge = 0;
-            if (scan.Precursors.Count > 0) {
-                precursorMH = scan.Precursors[0].Mh;
-                precursorMz = scan.Precursors[0].Mz;
-                charge = scan.Precursors[0].Charge;
-            }
-            scanInsert.Parameters.Clear();
-            scanInsert.Parameters.AddWithValue("$id", ++scanIndex);
+      if (scan.Precursors.Count > 0) {
+        precursorMH = scan.Precursors[0].MonoisotopicMz * scan.Precursors[0].Charge - 1.007276466 * (scan.Precursors[0].Charge - 1);
+        precursorMz = scan.Precursors[0].MonoisotopicMz;
+        charge = scan.Precursors[0].Charge;
+      }
+      scanInsert.Parameters.Clear();
+      scanInsert.Parameters.AddWithValue("$id", ++scanIndex);
             scanInsert.Parameters.AddWithValue("$scan", scan.ScanNumber);
             // No support for merged scans yet.
             scanInsert.Parameters.AddWithValue("$last_scan", scan.ScanNumber);
@@ -198,7 +201,7 @@ namespace Monocle.File {
             scanInsert.Parameters.AddWithValue("$precursor_mz", precursorMz);
             scanInsert.Parameters.AddWithValue("$charge", charge);
             scanInsert.Parameters.AddWithValue("$total_intensity", scan.TotalIonCurrent);
-            scanInsert.Parameters.AddWithValue("$polarity", scan.Polarity == Polarity.Negative ? "-" : "+");
+            scanInsert.Parameters.AddWithValue("$polarity", scan.Polarity ? "-" : "+");
             scanInsert.Parameters.AddWithValue("$base_peak_mz", scan.BasePeakMz);
             scanInsert.Parameters.AddWithValue("$base_peak_intensity", scan.BasePeakIntensity);
             scanInsert.Parameters.AddWithValue("$start_mz", scan.StartMz);
@@ -206,16 +209,16 @@ namespace Monocle.File {
             scanInsert.Parameters.AddWithValue("$low_mz", scan.LowestMz);
             scanInsert.Parameters.AddWithValue("$high_mz", scan.HighestMz);
             scanInsert.Parameters.AddWithValue("$parent_scan", scan.PrecursorMasterScanNumber);
-            scanInsert.Parameters.AddWithValue("$filter_line", scan.FilterLine);
-            scanInsert.Parameters.AddWithValue("$detector_type", scan.DetectorType);
-            scanInsert.Parameters.AddWithValue("$activation_type", scan.PrecursorActivationMethod);
+            scanInsert.Parameters.AddWithValue("$filter_line", scan.ScanFilter);
+      scanInsert.Parameters.AddWithValue("$detector_type", "DetectorType"); // scan.DetectorType);
+      scanInsert.Parameters.AddWithValue("$activation_type", "ActivationType");// scan.PrecursorActivationMethod);
             scanInsert.Parameters.AddWithValue("$activation_energy", scan.CollisionEnergy);
-            scanInsert.Parameters.AddWithValue("$ms_level", scan.MsOrder);
-            scanInsert.Parameters.AddWithValue("$scan_type", scan.ScanType);
+            scanInsert.Parameters.AddWithValue("$ms_level", scan.MsLevel);
+      scanInsert.Parameters.AddWithValue("$scan_type", "ScanType"); // scan.ScanType);
             scanInsert.Parameters.AddWithValue("$parent_type", "");
-            scanInsert.Parameters.AddWithValue("$master_index", scan.MasterIndex);
+      scanInsert.Parameters.AddWithValue("$master_index", "MasterIndex"); // scan.MasterIndex);
             scanInsert.Parameters.AddWithValue("$scan_event", scan.ScanEvent);
-            scanInsert.Parameters.AddWithValue("$peak_count", scan.Centroids.Count);
+            scanInsert.Parameters.AddWithValue("$peak_count", scan.Count());
             scanInsert.Parameters.AddWithValue("$ion_injection_time", scan.IonInjectionTime);
             scanInsert.Parameters.AddWithValue("$elapsed_scan_time", scan.ElapsedScanTime);
             scanInsert.Parameters.AddWithValue("$cv", scan.FaimsCV);
@@ -224,20 +227,20 @@ namespace Monocle.File {
             peakInsert.Parameters.Clear();
             peakInsert.Parameters.AddWithValue("$id", ++peakIndex);
             peakInsert.Parameters.AddWithValue("$scan", scan.ScanNumber);
-            peakInsert.Parameters.AddWithValue("$peak_count", scan.Centroids.Count);
+            peakInsert.Parameters.AddWithValue("$peak_count", scan.Count());
             peakInsert.Parameters.AddWithValue("$data_type", getPeakFlags(scan));
             // skipping compression for now.
             peakInsert.Parameters.AddWithValue("$data", encodePeaks(scan));
             peakInsert.ExecuteNonQuery();
 
-            foreach(Precursor precursor in scan.Precursors) {
+            foreach(PrecursorIon precursor in scan.Precursors) {
                 precursorInsert.Parameters.Clear();
                 precursorInsert.Parameters.AddWithValue("$id", ++precursorIndex);
                 precursorInsert.Parameters.AddWithValue("$scan", scan.ScanNumber);
-                precursorInsert.Parameters.AddWithValue("$precursor_mz", precursor.Mz);
-                precursorInsert.Parameters.AddWithValue("$precursor_mh", precursor.Mh);
+                precursorInsert.Parameters.AddWithValue("$precursor_mz", precursor.MonoisotopicMz);
+                precursorInsert.Parameters.AddWithValue("$precursor_mh", precursor.MonoisotopicMz);
                 precursorInsert.Parameters.AddWithValue("$precursor_charge", precursor.Charge);
-                precursorInsert.Parameters.AddWithValue("$original_mz", precursor.Mz);
+                precursorInsert.Parameters.AddWithValue("$original_mz", precursor.IsolationMz);
                 precursorInsert.Parameters.AddWithValue("$original_charge", precursor.Charge);
                 precursorInsert.Parameters.AddWithValue("$isolation_mz", precursor.IsolationMz);
                 precursorInsert.Parameters.AddWithValue("$isolation_width", precursor.IsolationWidth);
@@ -252,17 +255,19 @@ namespace Monocle.File {
         /// </summary>
         /// <param name="scan">The scan with the peak data.</param>
         /// <returns>An integer with the flags for the type of data stored.</returns>
-        private int getPeakFlags(Scan scan) {
+        private int getPeakFlags(Spectrum scan) {
             int output = 0;
-            if (scan.DetectorType == "FTMS" || scan.DetectorType == "ASTMS") {
-                output = HAS_MZ_DOUBLE | HAS_INTENSITY | HAS_BASELINE | HAS_NOISE;
-            }
-            else {
-                output = HAS_MZ_FLOAT | HAS_INTENSITY;
-            }
-            if (scan.DetectorType == "ASTMS") {
-                output |= HAS_RESOLUTION;
-            }
+
+            //TODO: Restore this functionality.
+            //if (scan.DetectorType == "FTMS" || scan.DetectorType == "ASTMS") {
+            //    output = HAS_MZ_DOUBLE | HAS_INTENSITY | HAS_BASELINE | HAS_NOISE;
+            //}
+            //else {
+            //    output = HAS_MZ_FLOAT | HAS_INTENSITY;
+            //}
+            //if (scan.DetectorType == "ASTMS") {
+            //    output |= HAS_RESOLUTION;
+            //}
             return output;
         }
 
@@ -271,19 +276,21 @@ namespace Monocle.File {
         /// </summary>
         /// <param name="scan">The scan with the peaks to store</param>
         /// <returns>A byte array with the peak data.</returns>
-        private byte[] encodePeaks(Scan scan) {
-            int peakCount = scan.Centroids.Count;
+        private byte[] encodePeaks(Spectrum scan) {
+            int peakCount = scan.Count();
             double[] mz = new double[peakCount];
             float[] all = new float[peakCount * 5];
             uint[] resolution = new uint[peakCount];
-            for (int i = 0; i < scan.Centroids.Count; ++i) {
-                Centroid peak = scan.Centroids[i];
+            for (int i = 0; i < scan.Count(); ++i) {
+                sSpecDP peak = scan.DataPoints[i];
                 mz[i] = peak.Mz;
                 all[i] = (float) peak.Mz;
                 all[i + peakCount] = (float) peak.Intensity;
-                all[i + (peakCount * 2)] = (float) peak.Baseline;
-                all[i + (peakCount * 3)] = (float) peak.Noise;
-                resolution[i] = peak.Resolution;
+                
+                //TODO: restore this
+                //all[i + (peakCount * 2)] = (float) peak.Baseline;
+                //all[i + (peakCount * 3)] = (float) peak.Noise;
+                //resolution[i] = peak.Resolution;
             }
 
             int mzFloatBytes = peakCount * sizeof(float);
@@ -294,7 +301,7 @@ namespace Monocle.File {
             int resolutionBytes = peakCount * sizeof(uint);
 
             byte[] output = null;
-            if (scan.DetectorType == "FTMS") {
+            /*if (scan.DetectorType == "FTMS") {
                 output = new byte[mzDoubleBytes + intensityBytes + baselineBytes + noiseBytes];
                 Buffer.BlockCopy(mz, 0, output, 0, mzDoubleBytes);
                 Buffer.BlockCopy(all, mzFloatBytes, output, mzDoubleBytes, intensityBytes + baselineBytes + noiseBytes);
@@ -305,10 +312,10 @@ namespace Monocle.File {
                 Buffer.BlockCopy(all, mzFloatBytes, output, mzDoubleBytes, intensityBytes + baselineBytes + noiseBytes);
                 Buffer.BlockCopy(resolution, 0, output, mzDoubleBytes + intensityBytes + baselineBytes + noiseBytes, resolutionBytes);
             }
-            else {
+            else {*/
                 output = new byte[mzFloatBytes + intensityBytes];
                 Buffer.BlockCopy(all, 0, output, 0, mzFloatBytes + intensityBytes);
-            }
+            //}
 
             return output;
         }

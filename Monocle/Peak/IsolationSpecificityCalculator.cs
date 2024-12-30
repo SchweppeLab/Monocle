@@ -1,5 +1,6 @@
 
 using Monocle.Data;
+using ProjectMIDAS.Data.Spectrum;
 using System.Collections.Generic;
 
 namespace Monocle.Peak {
@@ -8,8 +9,8 @@ namespace Monocle.Peak {
     /// mz and intensity within the window given by isolationWindow.
     /// </summary>
     public static class IsolationSpecificityCalculator {
-        public static double calculate(List<Centroid> peaks, double isolationMz, double precursorMz, int charge, double isolationWindow) {
-            if (peaks.Count == 0) {
+        public static double calculate(ref sSpecDP[] peaks, int sz, double isolationMz, double precursorMz, int charge, double isolationWindow) {
+            if (sz == 0) {
                 return 0;
             }
 
@@ -18,11 +19,11 @@ namespace Monocle.Peak {
             double lowMz = isolationMz - (isolationWindow / 2.0);
             double highMz = isolationMz + (isolationWindow / 2.0);
 
-            int i = PeakMatcher.NearestIndex(peaks, lowMz);
+            int i = PeakMatcher.NearestIndex(ref peaks, sz, lowMz);
             if (peaks[i].Mz < lowMz) {
                 ++i;
             }
-            for ( ; i < peaks.Count && peaks[i].Mz < highMz; ++i) {
+            for ( ; i < sz && peaks[i].Mz < highMz; ++i) {
                 var peak = peaks[i];
                 
                 // if the peak is within 20 ppm of any isotope

@@ -1,4 +1,5 @@
 ﻿using Monocle.Data;
+using ProjectMIDAS.Data.Spectrum;
 using Monocle.File;
 using System;
 using System.Collections.Generic;
@@ -145,8 +146,8 @@ namespace Monocle
                         header.FileName = Path.GetFileName(newFile);
                         header.FilePath = newFile;
 
-                        var Scans = new List<Scan>();
-                        foreach (Scan scan in reader)
+                        var Scans = new List<Spectrum>();
+                        foreach (Spectrum scan in reader)
                         {
                             token.ThrowIfCancellationRequested();
                             Scans.Add(scan);
@@ -189,7 +190,7 @@ namespace Monocle
                         IScanWriter writer = ScanWriterFactory.GetWriter(monocleOptions.OutputFileType);
                         writer.Open(outputFilePath);
                         writer.WriteHeader(header);
-                        foreach (Scan scan in Scans) {
+                        foreach (Spectrum scan in Scans) {
                             token.ThrowIfCancellationRequested();
                             writer.WriteScan(scan);
                         }
@@ -220,9 +221,9 @@ namespace Monocle
             return (CurrentProgress > 100) ? 100 : CurrentProgress;
         }
 
-        public void EmptyScans(List<Scan> Scans)
+        public void EmptyScans(List<Spectrum> Scans)
         {
-            foreach (Scan scan in Scans)
+            foreach (Spectrum scan in Scans)
             {
                 scan.Dispose();
             }

@@ -1,4 +1,6 @@
 ﻿using Monocle.Data;
+using ProjectMIDAS.Data;
+using ProjectMIDAS.Data.Spectrum;
 using Monocle.Math;
 using Monocle.Peak;
 using System;
@@ -14,7 +16,7 @@ namespace Monocle
         /// <param name="AllScans"></param>
         /// <param name="DependentScan"></param>
         /// <param name="Number_Of_Scans_To_Average"></param>
-        public static void Run(ref List<Scan> scans, MonocleOptions Options)
+        public static void Run(ref List<Spectrum> scans, MonocleOptions Options)
         {
             if (Options.Ms2Ms3Precursor) {
                 AssignMs3Precursors(scans);
@@ -22,9 +24,9 @@ namespace Monocle
 
             CheckMs2Precursors(scans);
             
-            foreach (Scan scan in scans)
+            foreach (Spectrum scan in scans)
             {
-                if (scan.MsOrder != Options.MS_Level)
+                if (scan.MsLevel != Options.MS_Level)
                 {
                     continue;
                 }
@@ -35,27 +37,27 @@ namespace Monocle
                     continue;
                 }
 
-                Scan precursorScan = scans[scan.PrecursorMasterScanNumber - 1];
+                Spectrum precursorScan = scans[scan.PrecursorMasterScanNumber - 1];
 
                 // Handle back-to-back triggered scans where the parent scan is assigned
                 // to the ms2 but the precursor is in the ms1.
-                if (scan.MsOrder == 2 && precursorScan.MsOrder == scan.MsOrder && precursorScan.PrecursorMasterScanNumber > 0) {
+                if (scan.MsLevel == 2 && precursorScan.MsLevel == scan.MsLevel && precursorScan.PrecursorMasterScanNumber > 0) {
                     precursorScan = scans[precursorScan.PrecursorMasterScanNumber - 1];
                 }
 
                 // For low-res scans, or if ForceCharges is true, or if there's no charge information
                 // and monoisotopic peak detection is disabled, generate precursors with
                 // a range of charges given by the ChargeRangeUnknown option.
-                bool lowResPrecursor = precursorScan.FilterLine.Contains("ITMS");
+                bool lowResPrecursor = precursorScan.ScanFilter.Contains("ITMS");
                 int range = 1 + Options.ChargeRangeUnknown.High - Options.ChargeRangeUnknown.Low;
-                var precursors = new List<Precursor>(range);
+                var precursors = new List<PrecursorIon>(range);
                 foreach (var precursor in scan.Precursors)
                 {
                     if (lowResPrecursor || Options.ForceCharges || (precursor.Charge == 0 && Options.SkipMono))
                     {
                         for (int z = Options.ChargeRangeUnknown.Low; z <= Options.ChargeRangeUnknown.High; ++z)
                         {
-                            var p = new Precursor(precursor);
+                            var p = new PrecursorIon(precursor);
                             p.Charge = z;
                             precursors.Add(p);
                         }
@@ -69,7 +71,7 @@ namespace Monocle
                 if (!Options.SkipMono && !lowResPrecursor)
                 {
                     var nearbyScans = GetNearbyScans(ref scans, precursorScan, Options);
-                    precursors = new List<Precursor>();
+                    precursors = new List<PrecursorIon>();
                     foreach (var precursor in scan.Precursors)
                     {
                         if (!Options.Charge_Detection && precursor.Charge == 0)
@@ -85,7 +87,7 @@ namespace Monocle
                             Console.WriteLine(String.Format("No charge found for scan {0}. Using charge range.", scan.ScanNumber));
                             for (int z = Options.ChargeRangeUnknown.Low; z <= Options.ChargeRangeUnknown.High; ++z)
                             {
-                                var p = new Precursor(precursor);
+                                var p = new PrecursorIon(precursor);
                                 p.Charge = z;
                                 precursors.Add(p);
                             }
@@ -109,10 +111,10 @@ namespace Monocle
         /// <param name="precursorScan">the target scan.</param>
         /// <param name="Options">Options for selecting scans.</param>
         /// <returns>A list of filtered scans.</returns>
-        public static List<Scan> GetNearbyScans(ref List<Scan> scans, Scan precursorScan, MonocleOptions Options)
+        public static List<Spectrum> GetNearbyScans(ref List<Spectrum> scans, Spectrum precursorScan, MonocleOptions Options)
         {
             int window = Options.Number_Of_Scans_To_Average;
-            var output = new List<Scan>(window * 2);
+            var output = new List<Spectrum>(window * 2);
             int index = precursorScan.ScanNumber - 1;
             if (index < 0) {
                 return output;
@@ -161,20 +163,20 @@ namespace Monocle
         /// <param name="scan">The scan in question</param>
         /// <param name="precursorScan">The taret scan to compare against.</param>
         /// <returns>Boolean whether to use the scan.</returns>
-        public static bool IncludeNearbyScan(Scan scan, Scan precursorScan)
+        public static bool IncludeNearbyScan(Spectrum scan, Spectrum precursorScan)
         {
-            if (scan.MsOrder != 1) {
+            if (scan.MsLevel != 1) {
                 return false;
             }
 
             // Faims scan matching.
-            if (scan.FaimsState == Data.TriState.On && scan.FaimsCV != precursorScan.FaimsCV) {
+            if (scan.FaimsCV != 0 && scan.FaimsCV != precursorScan.FaimsCV) {
                 return false;
             }
 
             // SIM scan exclusion.
             // Using the filterline here since the scan type might not be read.
-            if (scan.ScanNumber != precursorScan.ScanNumber && !scan.FilterLine.ToLower().Contains("full")) {
+            if (scan.ScanNumber != precursorScan.ScanNumber && !scan.ScanFilter.ToLower().Contains("full")) {
                 return false;
             }
 
@@ -184,14 +186,14 @@ namespace Monocle
         /// <summary>
         /// Assign MS^3 precursors from the parent MS2 scan.
         /// </summary>
-        private static void AssignMs3Precursors(List<Scan> scans)
+        private static void AssignMs3Precursors(List<Spectrum> scans)
         {
-            foreach (Scan scan in scans)
+            foreach (Spectrum scan in scans)
             {
-                if (scan.MsOrder != 3 || scan.PrecursorMasterScanNumber < 0 || scan.PrecursorMasterScanNumber > scans.Count) {
+                if (scan.MsLevel != 3 || scan.PrecursorMasterScanNumber < 0 || scan.PrecursorMasterScanNumber > scans.Count) {
                     continue;
                 }
-                Scan precursorScan = scans[scan.PrecursorMasterScanNumber - 1];
+                Spectrum precursorScan = scans[scan.PrecursorMasterScanNumber - 1];
                 if (precursorScan.Precursors.Count > 0)
                 {
                     scan.Precursors = precursorScan.Precursors;
@@ -203,11 +205,11 @@ namespace Monocle
         /// Check MS^2 scans to make sure precursor scan numbers are assigned.
         /// If precursor scan is zero, use the number from the last MS^1 scan.
         /// </summary>
-        private static void CheckMs2Precursors(List<Scan> scans)
+        private static void CheckMs2Precursors(List<Spectrum> scans)
         {
             for (int i = 0; i < scans.Count; ++i) {
-                Scan scan = scans[i];
-                if (scan.MsOrder == 2 && scan.PrecursorMasterScanNumber == 0) {
+                Spectrum scan = scans[i];
+                if (scan.MsLevel == 2 && scan.PrecursorMasterScanNumber == 0) {
                     scan.PrecursorMasterScanNumber = FindLastMS1(scans, i);
                 }
             }
@@ -216,9 +218,9 @@ namespace Monocle
         /// <summary>
         /// Finds the number of the last MS^1 scan
         /// </summary>
-        private static int FindLastMS1(List<Scan> scans, int startIndex) {
+        private static int FindLastMS1(List<Spectrum> scans, int startIndex) {
             for (int j = startIndex; j >= 0; --j) {
-                if (scans[j].MsOrder == 1) {
+                if (scans[j].MsLevel == 1) {
                     return scans[j].ScanNumber;
                 }
             }
@@ -231,20 +233,20 @@ namespace Monocle
         /// <param name="Ms1ScansCentroids"></param>
         /// <param name="ParentScan"></param>
         /// <param name="precursor"></param>
-        public static void Run(List<Scan> Ms1ScansCentroids, Scan ParentScan, Precursor precursor, MonocleOptions Options)
+        public static void Run(List<Spectrum> Ms1ScansCentroids, Spectrum ParentScan, PrecursorIon precursor, MonocleOptions Options)
         {
             double precursorMz = precursor.IsolationMz;
-            if (Options.RawMonoMz && precursor.Mz > 1)
+            if (Options.RawMonoMz && precursor.MonoisotopicMz > 1)
             {
-                precursorMz = precursor.Mz;
+                precursorMz = precursor.MonoisotopicMz;
             }
             if (precursorMz < 1)
             {
-                precursorMz = precursor.OriginalMz;
+                precursorMz = precursor.IsolationMz;
             }
             if (precursorMz < 1)
             {
-                precursorMz = precursor.Mz;
+                precursorMz = precursor.MonoisotopicMz;
             }
             int precursorCharge = precursor.Charge;
 
@@ -254,7 +256,7 @@ namespace Monocle
                 int peakIndex = PeakMatcher.MostIntenseIndex(ParentScan, precursor.IsolationMz, precursor.IsolationWidth / 2, PeakMatcher.DALTON);
                 if (peakIndex >= 0)
                 {
-                    precursorMz = ParentScan.Centroids[peakIndex].Mz;
+                    precursorMz = ParentScan.DataPoints[peakIndex].Mz;
                 }    
             }
 
@@ -262,7 +264,7 @@ namespace Monocle
             int index = PeakMatcher.Match(ParentScan, precursorMz, 50, PeakMatcher.PPM);
             if (index >= 0)
             {
-                precursorMz = ParentScan.Centroids[index].Mz;
+                precursorMz = ParentScan.DataPoints[index].Mz;
             }
 
             // For charge detection
@@ -283,7 +285,7 @@ namespace Monocle
             for (int charge = chargeRange.Low; charge <= chargeRange.High; charge++)
             {
                 // Restrict number of isotopes to consider based on precursor mass.
-                double mass = precursor.Mz * charge;
+                double mass = precursor.IsolationMz * charge;
                 var isotopeRange = new IsotopeRange(mass);
 
                 // Generate expected relative intensities.
@@ -326,17 +328,18 @@ namespace Monocle
             // Calculate m/z
             if (bestPeaks.Count > 0)
             {
-                precursor.Mz = Vector.WeightedAverage(bestPeaks, bestPeakIntensities);
+                precursor.MonoisotopicMz = Vector.WeightedAverage(bestPeaks, bestPeakIntensities);
             }
             else
             {
-                precursor.Mz = precursorMz;
+                precursor.MonoisotopicMz = precursorMz;
             }
 
             precursor.IsolationSpecificity = IsolationSpecificityCalculator.calculate(
-                ParentScan.Centroids,
+                ref ParentScan.DataPoints,
+                ParentScan.Count(),
                 precursor.IsolationMz,
-                precursor.Mz,
+                precursor.MonoisotopicMz,
                 precursor.Charge,
                 precursor.IsolationWidth
             );

@@ -1,5 +1,7 @@
 
 using Monocle.Data;
+using ProjectMIDAS.Data.Spectrum;
+using ProjectMIDAS.Data;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -63,7 +65,7 @@ namespace Monocle.File {
         /// Writes a scan tag.
         /// </summary>
         /// <param name="scan"></param>
-        public virtual void WriteScan(Scan scan)
+        public virtual void WriteScan(Spectrum scan)
         {
             writer.WriteStartElement("scan");
 
@@ -75,11 +77,11 @@ namespace Monocle.File {
             scanIndex.Add(scan.ScanNumber, pos);
 
             writer.WriteAttributeString("num", scan.ScanNumber.ToString());
-            writer.WriteAttributeString("msLevel", scan.MsOrder.ToString());
-            writer.WriteAttributeString("peaksCount", scan.PeakCount.ToString());
-            writer.WriteAttributeString("polarity", scan.Polarity == Polarity.Positive ? "+" : "-");
-            writer.WriteAttributeString("scanType", scan.ScanType.ToString());
-            writer.WriteAttributeString("filterLine", scan.FilterLine);
+            writer.WriteAttributeString("msLevel", scan.MsLevel.ToString());
+            writer.WriteAttributeString("peaksCount", scan.Count().ToString());
+            writer.WriteAttributeString("polarity", scan.Polarity ? "+" : "-");
+      writer.WriteAttributeString("scanType", "Don't remember what this is for"); // scan.ScanType.ToString());
+            writer.WriteAttributeString("filterLine", scan.ScanFilter);
             writer.WriteAttributeString("retentionTime", MakeRetentionTimeString(scan.RetentionTime));
             writer.WriteAttributeString("startMz", scan.StartMz.ToString());
             writer.WriteAttributeString("endMz", scan.EndMz.ToString("G17", CultureInfo.InvariantCulture));
@@ -90,17 +92,17 @@ namespace Monocle.File {
             writer.WriteAttributeString("totIonCurrent", scan.TotalIonCurrent.ToString());
 
             //tSIM/MSX methods could be MS1s with "SPS" ions so no ms order consideration here
-            if (scan.MsOrder > 1)
+            if (scan.MsLevel > 1)
             {
                 writer.WriteAttributeString("collisionEnergy", scan.CollisionEnergy.ToString());
-                foreach (Precursor precursor in scan.Precursors)
+                foreach (PrecursorIon precursor in scan.Precursors)
                 {
                     writer.WriteStartElement("precursorMz");
                     writer.WriteAttributeString("precursorScanNum", scan.PrecursorMasterScanNumber.ToString());
                     writer.WriteAttributeString("precursorIntensity", precursor.Intensity.ToString());
                     writer.WriteAttributeString("precursorCharge", precursor.Charge.ToString());
-                    writer.WriteAttributeString("activationMethod", scan.PrecursorActivationMethod.ToString());
-                    writer.WriteString(precursor.Mz.ToString("G17", CultureInfo.InvariantCulture));
+                    writer.WriteAttributeString("activationMethod", "probably CID or HCD, ETD has only a small chance.");
+                    writer.WriteString(precursor.MonoisotopicMz.ToString("G17", CultureInfo.InvariantCulture));
                     writer.WriteEndElement(); // precursorMz
                 }
             }
@@ -152,16 +154,16 @@ namespace Monocle.File {
         /// </summary>
         /// <param name="scan"></param>
         /// <returns></returns>
-        protected string EncodePeaks(Scan scan) {
-            if (scan.PeakCount == 0) {
+        protected string EncodePeaks(Spectrum scan) {
+            if (scan.Count() == 0) {
                 return "AAAAAAAAAAA=";
             }
             
             // Allocate space for m/z and int pairs, four bytes each.
-            byte[] bytes = new byte[scan.PeakCount * 2 * 4];
+            byte[] bytes = new byte[scan.Count() * 2 * 4];
 
-            for (int i = 0; i < scan.PeakCount; ++i) {
-                Centroid peak = scan.Centroids[i];
+            for (int i = 0; i < scan.Count(); ++i) {
+                sSpecDP peak = scan.DataPoints[i];
                 byte[] mzBytes = BitConverter.GetBytes((float)peak.Mz);
                 Array.Reverse(mzBytes);
                 mzBytes.CopyTo(bytes, i * 8);
