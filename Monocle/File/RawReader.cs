@@ -1,4 +1,5 @@
 ﻿using Monocle.Data;
+using ProjectMIDAS.Data.Spectrum;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -7,6 +8,8 @@ using ThermoBiz = ThermoFisher.CommonCore.Data.Business;
 using ThermoFisher.CommonCore.Data.FilterEnums;
 using ThermoFisher.CommonCore.Data.Interfaces;
 using ThermoFisher.CommonCore.RawFileReader;
+using System.Security.Cryptography.Xml;
+using ProjectMIDAS.Data;
 
 namespace Monocle.File
 {
@@ -62,7 +65,7 @@ namespace Monocle.File
 
         public ScanFileHeader GetHeader()
         {
-            var header = new ScanFileHeader();
+      var header = new ScanFileHeader();
             header.StartTime = (float) rawFile.RunHeaderEx.StartTime;
             header.EndTime = (float) rawFile.RunHeaderEx.EndTime;
             header.AcquisitionDate = rawFile.CreationDate;
@@ -101,7 +104,7 @@ namespace Monocle.File
                     LastMS1 = iScanNumber;
                 }
                 
-                Data.Scan scan = new Data.Scan()
+                Spectrum scan = new Spectrum()
                 {
                     ScanNumber = iScanNumber,
                     ScanEvent = (iScanNumber - LastMS1) + 1,
@@ -113,40 +116,40 @@ namespace Monocle.File
                     StartMz = scanFilter.GetMassRange(0).Low,
                     EndMz = scanFilter.GetMassRange(0).High,
                     ScanType = ReadScanType(scanFilter.ToString()),
-                    MsOrder = (int)scanFilter.MSOrder,
-                    Polarity = (scanFilter.Polarity == PolarityType.Positive) ? Data.Polarity.Positive : Data.Polarity.Negative,
-                    FilterLine = scanFilter.ToString(),
+                    MsLevel = (int)scanFilter.MSOrder,
+                    Polarity = (scanFilter.Polarity == PolarityType.Positive) ? true : false,
+                    ScanFilter = scanFilter.ToString(),
                     DetectorType = readDetectorType(scanFilter.MassAnalyzer),
                     RetentionTime = rawFile.RetentionTimeFromScanNumber(iScanNumber)
                 };
 
                 // Precursor info can come from multiple places in the raw file.
                 // Mono m/z will be resolved in the SetPrecursors method.
-                var reactionPrecursor = new Data.Precursor();
-                var spsMasses = new List<Data.Precursor>();
+                var reactionPrecursor = new PrecursorIon();
+                var spsMasses = new List<PrecursorIon>();
                 double monoMz = 0;
                 int charge = 0;
 
-                if(scan.MsOrder > 1)
+                if(scan.MsLevel > 1)
                 {
                     // Get the current scan's activation method while ignoring upstream activation
-                    scan.PrecursorActivationMethod = ConvertActivationType(scanFilter.GetActivation(scan.MsOrder - 2));
+                    scan.PrecursorActivationMethod = ConvertActivationType(scanFilter.GetActivation(scan.MsLevel - 2));
                     if (scanEvent.MassCount > 0) {
                         // Last reaction should be the precursor for the current MS level
                         var reaction = scanEvent.GetReaction(scanEvent.MassCount - 1);
                         scan.CollisionEnergy = reaction.CollisionEnergy;
-                        reactionPrecursor = new Data.Precursor {
+                        reactionPrecursor = new PrecursorIon {
                             IsolationWidth = reaction.IsolationWidth,
                             IsolationMz = reaction.PrecursorMass,
-                            Mz = reaction.PrecursorMass,
-                            OriginalMz = reaction.PrecursorMass
+                            MonoisotopicMz = reaction.PrecursorMass,
+                            //OriginalMz = reaction.PrecursorMass
                         };
                     }
                 }
 
                 // Some scans dont have CV
                 // in the trailer, but it shows up in the filter line.
-                scan.FaimsCV = ReadCVFromFilter(scan.FilterLine);
+                scan.FaimsCV = ReadCVFromFilter(scan.ScanFilter);
 
                 var runHeader = rawFile.RunHeader;
                 var trailer = rawFile.GetTrailerExtraInformation(iScanNumber);
@@ -190,7 +193,7 @@ namespace Monocle.File
                             scan.FaimsCV = double.Parse(value);
                             break;
                         case "FAIMS Voltage On:":
-                            scan.FaimsState = (value == "No") ? Data.TriState.Off : Data.TriState.On;
+                            //scan.FaimsState = (value == "No") ? Data.TriState.Off : Data.TriState.On;
                             break;
                         case "SPS Masses:":
                             string[] spsMassStrings = value.TrimEnd(',').Split(',');
@@ -200,7 +203,7 @@ namespace Monocle.File
                                 {
                                     if (double.TryParse(spsMassStrings[spsIndex], out double spsMass))
                                     {
-                                        spsMasses.Add(new Data.Precursor(spsMass, 0, 1));
+                                        spsMasses.Add(new PrecursorIon(spsMass, 0, 1));
                                     }
                                 }
                             }
@@ -208,12 +211,12 @@ namespace Monocle.File
                     }
                 }
                 
-                if (scan.PrecursorMasterScanNumber <= 0 && scan.MsOrder > 1) {
+                if (scan.PrecursorMasterScanNumber <= 0 && scan.MsLevel > 1) {
                     // Try again to set the precursor scan.
                     SetPrecursorScanNumber(scan);
                 }
 
-                if (scan.MsOrder > 1 && scan.PrecursorMasterScanNumber >= rawFile.RunHeader.FirstSpectrum && scan.PrecursorMasterScanNumber < rawFile.RunHeader.LastSpectrum)
+                if (scan.MsLevel > 1 && scan.PrecursorMasterScanNumber >= rawFile.RunHeader.FirstSpectrum && scan.PrecursorMasterScanNumber < rawFile.RunHeader.LastSpectrum)
                 {
                     SetPrecursors(scan, reactionPrecursor, spsMasses, monoMz, charge);
 
@@ -240,9 +243,9 @@ namespace Monocle.File
                     CentroidsFromArrays(scan, thermoScan.PreferredMasses, thermoScan.PreferredIntensities);
                 }
 
-                if (scan.PeakCount > 0) {
-                    scan.LowestMz = scan.Centroids[0].Mz;
-                    scan.HighestMz = scan.Centroids[scan.PeakCount - 1].Mz;
+                if (scan.Count() > 0) {
+                    scan.LowestMz = scan.DataPoints[0].Mz;
+                    scan.HighestMz = scan.DataPoints[scan.Count() - 1].Mz;
                 }
 
                 yield return scan;
@@ -256,7 +259,7 @@ namespace Monocle.File
         /// <param name="mzArray"></param>
         /// <param name="intensityArray"></param>
         public void CentroidsFromArrays(
-            Data.Scan scan,
+            Spectrum scan,
             double[] mzs,
             double[] intensities,
             double[] baselines=null,
@@ -268,27 +271,24 @@ namespace Monocle.File
                 Console.WriteLine("Scan number " + scan.ScanNumber + " has no peak data.");
                 return;
             }
-            scan.PeakCount = mzs.Length;
+            scan.Resize(mzs.Length);
             for (int i = 0; i < mzs.Length; i++)
             {
-                Centroid tempCentroid = new Centroid()
-                {
-                    Mz = mzs[i],
-                    Intensity = intensities[i],
-                };
-                if(baselines != null)
-                {
-                    tempCentroid.Baseline = baselines[i];
-                }
-                if(noises != null)
-                {
-                    tempCentroid.Noise = noises[i];
-                }
-                if(resolutions != null)
-                {
-                    tempCentroid.Resolution = (uint) resolutions[i];
-                }
-                scan.Centroids.Add(tempCentroid);
+        scan.DataPoints[i].Mz = mzs[i];
+        scan.DataPoints[i].Intensity = intensities[i];
+
+                //if(baselines != null)
+                //{
+                //    tempCentroid.Baseline = baselines[i];
+                //}
+                //if(noises != null)
+                //{
+                //    tempCentroid.Noise = noises[i];
+                //}
+                //if(resolutions != null)
+                //{
+                //    tempCentroid.Resolution = (uint) resolutions[i];
+                //}
             }
         }
 
@@ -367,7 +367,7 @@ namespace Monocle.File
         /// from the "Master Scan Number" field in the scan header.
         /// </summary>
         /// <param name="scan">The scan that needs the assignment of the parent scan number</param>
-        private void SetPrecursorScanNumber(Data.Scan scan)
+        private void SetPrecursorScanNumber(Spectrum scan)
         {
             if (!ScanParentsLoaded) {
                 // Populate the index - this can be slow.
@@ -395,21 +395,21 @@ namespace Monocle.File
         /// If the scan header has "Charge:" then the charge will be
         /// saved for all precursors.
         /// </para>
-        private void SetPrecursors(Data.Scan scan, Data.Precursor reaction, List<Data.Precursor> spsMasses, double monoMz, int charge) {
+        private void SetPrecursors(Spectrum scan, PrecursorIon reaction, List<PrecursorIon> spsMasses, double monoMz, int charge) {
             scan.Precursors.Clear();
 
             // Use scanEvent reaction
             double scanMz = 0;
             double isoWidth = 2;
             if (monoMz > 1) {
-                reaction.Mz = monoMz;
+                reaction.MonoisotopicMz = monoMz;
             }
             if (charge > 0) {
-                reaction.OriginalCharge = reaction.Charge;
+                //reaction.OriginalCharge = reaction.Charge;
                 reaction.Charge = charge;
             }
-            if (reaction.Mz > 1) {
-                scanMz = reaction.Mz;
+            if (reaction.MonoisotopicMz > 1) {
+                scanMz = reaction.MonoisotopicMz;
                 if (reaction.IsolationWidth > 0.01) {
                     isoWidth = reaction.IsolationWidth;
                 }
@@ -418,7 +418,7 @@ namespace Monocle.File
 
             // Add in sps ions. if mz already added then skip it.
             foreach (var precursor in spsMasses) {
-                if (scanMz > 1 && System.Math.Abs(precursor.Mz - scanMz) < isoWidth) {
+                if (scanMz > 1 && System.Math.Abs(precursor.MonoisotopicMz - scanMz) < isoWidth) {
                     continue;
                 }
 

@@ -80,7 +80,7 @@ namespace Monocle.File {
             writer.WriteAttributeString("msLevel", scan.MsLevel.ToString());
             writer.WriteAttributeString("peaksCount", scan.Count().ToString());
             writer.WriteAttributeString("polarity", scan.Polarity ? "+" : "-");
-      writer.WriteAttributeString("scanType", "Don't remember what this is for"); // scan.ScanType.ToString());
+            writer.WriteAttributeString("scanType", scan.ScanType.ToString());
             writer.WriteAttributeString("filterLine", scan.ScanFilter);
             writer.WriteAttributeString("retentionTime", MakeRetentionTimeString(scan.RetentionTime));
             writer.WriteAttributeString("startMz", scan.StartMz.ToString());
@@ -101,7 +101,7 @@ namespace Monocle.File {
                     writer.WriteAttributeString("precursorScanNum", scan.PrecursorMasterScanNumber.ToString());
                     writer.WriteAttributeString("precursorIntensity", precursor.Intensity.ToString());
                     writer.WriteAttributeString("precursorCharge", precursor.Charge.ToString());
-                    writer.WriteAttributeString("activationMethod", "probably CID or HCD, ETD has only a small chance.");
+                    writer.WriteAttributeString("activationMethod", scan.PrecursorActivationMethod);
                     writer.WriteString(precursor.MonoisotopicMz.ToString("G17", CultureInfo.InvariantCulture));
                     writer.WriteEndElement(); // precursorMz
                 }
