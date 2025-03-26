@@ -5,6 +5,7 @@ using System;
 using System.Collections;
 using Microsoft.Data.Sqlite;
 using System.IO;
+using Nova.Data;
 
 
 namespace Monocle.File
@@ -53,18 +54,17 @@ namespace Monocle.File
             {
                 while (scanReader.Read())
                 {
-                    var scan = new Scan{
+                    var scan = new Spectrum((int)(long)scanReader["peak_count"]){
                         ScanNumber = (int)(long) scanReader["scan"],
                         ScanEvent = (int)(long) scanReader["scan_event"],
-                        MsOrder = (int)(long) scanReader["ms_level"],
-                        PeakCount = (int)(long) scanReader["peak_count"],
+                        MsLevel = (int)(long) scanReader["ms_level"],
                         MasterIndex = (int)(long) scanReader["master_index"],
                         IonInjectionTime = (double) scanReader["ion_injection_time"],
                         ElapsedScanTime = (double) scanReader["elapsed_scan_time"],
                         Polarity = ReadPolarity((string) scanReader["polarity"]),
                         ScanType = (string) scanReader["scan_type"],
                         DetectorType = (string) scanReader["detector_type"],
-                        FilterLine = (string) scanReader["filter_line"],
+                        ScanFilter = (string) scanReader["filter_line"],
                         RetentionTime = (double) scanReader["time"],
                         StartMz = (double) scanReader["start_mz"],
                         EndMz = (double) scanReader["end_mz"],
@@ -74,7 +74,7 @@ namespace Monocle.File
                         BasePeakIntensity = (double) scanReader["base_peak_intensity"],
                         FaimsCV = (int)(long) (double) scanReader["cv"],
                         TotalIonCurrent = (double) scanReader["total_intensity"],
-                        CollisionEnergy = (double) scanReader["activation_energy"],
+                        //CollisionEnergy = (double) scanReader["activation_energy"],
                         PrecursorMasterScanNumber = (int)(long) scanReader["parent_scan"],
                         PrecursorActivationMethod = (string) scanReader["activation_type"]
                     };
@@ -92,12 +92,12 @@ namespace Monocle.File
                     precursorCommand.Parameters.AddWithValue("$scan", scan.ScanNumber);
                     using (var precursorReader = precursorCommand.ExecuteReader()) {
                         while (precursorReader.Read()) {
-                            Precursor precursor = new Precursor() {
-                                Mz = (double) precursorReader["precursor_mz"],
+                            PrecursorIon precursor = new PrecursorIon() {
+                                MonoisotopicMz = (double) precursorReader["precursor_mz"],
                                 Intensity = (double) precursorReader["precursor_intensity"],
                                 Charge = (int)(long) precursorReader["precursor_charge"],
-                                OriginalMz = (double) precursorReader["original_mz"],
-                                OriginalCharge = (int)(long) precursorReader["original_charge"],
+                                //OriginalMz = (double) precursorReader["original_mz"],
+                                //OriginalCharge = (int)(long) precursorReader["original_charge"],
                                 IsolationMz = (double) precursorReader["isolation_mz"],
                                 IsolationWidth = (double) precursorReader["isolation_width"],
                                 IsolationSpecificity = (double) precursorReader["isolation_specificity"]
@@ -111,8 +111,8 @@ namespace Monocle.File
             }
         }
 
-        private void DecodePeaks(Scan scan, int flags, byte[] data) {
-            int peakCount = scan.PeakCount;
+        private void DecodePeaks(Spectrum scan, int flags, byte[] data) {
+            int peakCount = scan.Count;
             int mzBytes = 0;
             int intensityOffset = 0;
             int baselineOffset = 0;
@@ -133,7 +133,7 @@ namespace Monocle.File
                 noiseOffset = baselineOffset + (4 * peakCount);
             }
             for (int i = 0; i < peakCount; ++i) {
-                Centroid centroid = new Centroid();
+                sSpecDP centroid = new sSpecDP();
                 if ((flags & MzDBWriter.HAS_MZ_FLOAT) != 0) {
                     centroid.Mz = BitConverter.ToSingle(data, i * mzBytes);
                 }
@@ -143,13 +143,13 @@ namespace Monocle.File
                 if ((flags & MzDBWriter.HAS_INTENSITY) != 0) {
                     centroid.Intensity = BitConverter.ToSingle(data, intensityOffset + (i * 4));
                 }
-                if ((flags & MzDBWriter.HAS_BASELINE) != 0) {
-                    centroid.Baseline = BitConverter.ToSingle(data, baselineOffset + (i * 4));
-                }
-                if ((flags & MzDBWriter.HAS_NOISE) != 0) {
-                    centroid.Noise = BitConverter.ToSingle(data, noiseOffset + (i * 4));
-                }
-                scan.Centroids.Add(centroid);
+                //if ((flags & MzDBWriter.HAS_BASELINE) != 0) {
+                //    centroid.Baseline = BitConverter.ToSingle(data, baselineOffset + (i * 4));
+                //}
+                //if ((flags & MzDBWriter.HAS_NOISE) != 0) {
+                //    centroid.Noise = BitConverter.ToSingle(data, noiseOffset + (i * 4));
+                //}
+                scan.DataPoints[i]=centroid;
             }
         }
 
@@ -175,14 +175,14 @@ namespace Monocle.File
             }
         }
 
-        private Polarity ReadPolarity(string polarity) {
+        private bool ReadPolarity(string polarity) {
             if (polarity == "+") {
-                return Polarity.Positive;
+                return true;
             }
             else if(polarity == "-") {
-                return Polarity.Negative;
+                return false;
             }
-            return Polarity.None;
+            return true;
         }
     }
 }

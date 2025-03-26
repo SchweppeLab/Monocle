@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
+using Nova.Data;
 
 namespace MakeMono
 {
@@ -63,7 +64,7 @@ namespace MakeMono
                     log.Info("Writing output: " + outputFilePath);
                     writer.Open(outputFilePath);
                     writer.WriteHeader(header);
-                    foreach (Scan scan in reader)
+                    foreach (Spectrum scan in reader)
                     {
                         writer.WriteScan(scan);
                     }
@@ -73,8 +74,8 @@ namespace MakeMono
                 }
                 else {
                     log.Info("Reading scans: " + file);
-                    List<Scan> Scans = new List<Scan>();
-                    foreach (Scan scan in reader)
+                    List<Spectrum> Scans = new List<Spectrum>();
+                    foreach (Spectrum scan in reader)
                     {
                         if (scan.ScanNumber < 1) {
                             continue;
@@ -88,7 +89,7 @@ namespace MakeMono
                     log.Info("Writing output: " + outputFilePath);
                     writer.Open(outputFilePath);
                     writer.WriteHeader(header);
-                    foreach (Scan scan in Scans)
+                    foreach (Spectrum scan in Scans)
                     {
                         writer.WriteScan(scan);
                     }

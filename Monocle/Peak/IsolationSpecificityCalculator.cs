@@ -1,5 +1,6 @@
 
 using Monocle.Data;
+using Nova.Data;
 using System.Collections.Generic;
 
 namespace Monocle.Peak {
@@ -8,8 +9,8 @@ namespace Monocle.Peak {
     /// mz and intensity within the window given by isolationWindow.
     /// </summary>
     public static class IsolationSpecificityCalculator {
-        public static double calculate(List<Centroid> peaks, double isolationMz, double precursorMz, int charge, double isolationWindow) {
-            if (peaks.Count == 0) {
+        public static double calculate(sSpecDP[] peaks, double isolationMz, double precursorMz, int charge, double isolationWindow) {
+            if (peaks.Length == 0) {
                 return 0;
             }
 
@@ -22,7 +23,7 @@ namespace Monocle.Peak {
             if (peaks[i].Mz < lowMz) {
                 ++i;
             }
-            for ( ; i < peaks.Count && peaks[i].Mz < highMz; ++i) {
+            for ( ; i < peaks.Length && peaks[i].Mz < highMz; ++i) {
                 var peak = peaks[i];
                 
                 // if the peak is within 20 ppm of any isotope

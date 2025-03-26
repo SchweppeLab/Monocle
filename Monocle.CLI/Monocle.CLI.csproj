@@ -1,19 +1,17 @@
-<Project Sdk="Microsoft.NET.Sdk">
-
+﻿<Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
-    <PackageReference Include="CommandLineParser" Version="2.6.0" />
     <PackageReference Include="NLog" Version="4.6.8" />
+    <PackageReference Include="Nova" Version="1.0.0" />
+    <PackageReference Include="Nova.IO" Version="1.0.0" />
   </ItemGroup>
-
   <ItemGroup>
     <ProjectReference Include="..\Monocle\Monocle.csproj" />
   </ItemGroup>
-
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>net6.0</TargetFramework>
+    <TargetFramework>net8.0</TargetFramework>
     <Version>0.4</Version>
     <InvariantGlobalization>false</InvariantGlobalization>
+    <Platforms>AnyCPU;x64</Platforms>
   </PropertyGroup>
-
 </Project>

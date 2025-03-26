@@ -1,34 +1,16 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
-	<PropertyGroup>
-		<TargetFramework>net48</TargetFramework>
-		<!-- Add these to ensure compatibility -->
-		<AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
-		<GenerateBindingRedirectsOutputType>true</GenerateBindingRedirectsOutputType>
-	</PropertyGroup>
-
-	<ItemGroup>
-		<PackageReference Include="SharpZipLib" Version="1.3.3" />
-		<!-- Change Microsoft.Data.Sqlite to a version compatible with .NET Framework -->
-		<PackageReference Include="Microsoft.Data.Sqlite" Version="3.1.32" />
-	</ItemGroup>
-
-	<!-- Add reference to .NET Framework assemblies if needed -->
-	<ItemGroup>
-		<Reference Include="System" />
-		<Reference Include="System.Core" />
-		<Reference Include="System.Data" />
-		<Reference Include="System.Xml" />
-		<Reference Include="ThermoFisher.CommonCore.BackgroundSubtraction">
-		  <HintPath>..\..\Orbiter2\Orbiter\packages\ThermoFisher.CommonCore.BackgroundSubtraction.dll</HintPath>
-		</Reference>
-		<Reference Include="ThermoFisher.CommonCore.Data">
-		  <HintPath>..\..\Orbiter2\Orbiter\packages\ThermoFisher.CommonCore.Data.dll</HintPath>
-		</Reference>
-		<Reference Include="ThermoFisher.CommonCore.MassPrecisionEstimator">
-		  <HintPath>..\..\Orbiter2\Orbiter\packages\ThermoFisher.CommonCore.MassPrecisionEstimator.dll</HintPath>
-		</Reference>
-		<Reference Include="ThermoFisher.CommonCore.RawFileReader">
-		  <HintPath>..\..\Orbiter2\Orbiter\packages\ThermoFisher.CommonCore.RawFileReader.dll</HintPath>
-		</Reference>
-	</ItemGroup>
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <!-- Add these to ensure compatibility -->
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <GenerateBindingRedirectsOutputType>true</GenerateBindingRedirectsOutputType>
+    <Platforms>AnyCPU;x64</Platforms>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Nova" Version="1.0.0" />
+    <!-- Change Microsoft.Data.Sqlite to a version compatible with .NET Framework -->
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="8.0.14" />
+    <PackageReference Include="Nova.IO" Version="1.0.0.2" />
+  </ItemGroup>
+  <!-- Add reference to .NET Framework assemblies if needed -->
 </Project>

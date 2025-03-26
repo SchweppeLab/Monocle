@@ -26,8 +26,8 @@ namespace Monocle.File
                     return new ExtendedMzXmlWriter();
                 case OutputFileType.mzdb:
                     return new MzDBWriter();
-                case OutputFileType.mzml:
-                    return new MzMlWriter();
+                //case OutputFileType.mzml:
+                //    return new MzMlWriter();
                 default:
                     break;
             }

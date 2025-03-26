@@ -2,6 +2,7 @@
 using Monocle.Data;
 using Monocle.Math;
 using System.Collections.Generic;
+using Nova.Data;
 
 namespace Monocle.Peak 
 {
@@ -16,10 +17,10 @@ namespace Monocle.Peak
         /// <param name="left">A negative or zero number to indicate the number of isotopes to extract to the left of targetMz</param>
         /// <param name="numIsotopes">The total number of isotopes to extract including the number indicated by "left"</param>
         /// <returns></returns>
-        public static PeptideEnvelope Extract(List<Scan> scans, double targetMz, int charge, int left, int numIsotopes)
+        public static PeptideEnvelope Extract(List<Spectrum> scans, double targetMz, int charge, int left, int numIsotopes)
         {
             PeptideEnvelope output = new PeptideEnvelope(numIsotopes, scans.Count);
-            foreach (Scan scan in scans)
+            foreach (Spectrum scan in scans)
             {
                 for (int i = 0; i < numIsotopes; ++i)
                 {
@@ -27,8 +28,8 @@ namespace Monocle.Peak
                     int index = PeakMatcher.Match(scan, matchMz, 3, PeakMatcher.PPM);
                     if (index >= 0)
                     {
-                        double mz = scan.Centroids[index].Mz;
-                        double intensity = scan.Centroids[index].Intensity;
+                        double mz = scan.DataPoints[index].Mz;
+                        double intensity = scan.DataPoints[index].Intensity;
                         output.mzs[i].Add(mz);
                         output.intensities[i].Add(intensity);
                     }

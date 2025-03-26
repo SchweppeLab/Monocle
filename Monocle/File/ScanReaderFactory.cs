@@ -21,7 +21,8 @@ namespace Monocle.File
             {
                 return new RawReader();
             }
-            else if (extension == ".mzdb")
+            else 
+            if (extension == ".mzdb")
             {
                 return new MzDBReader();
             }
